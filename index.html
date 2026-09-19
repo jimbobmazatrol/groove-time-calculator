@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Urapiston askeleen aikalaskuri</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color-scheme:dark}
+*{box-sizing:border-box} body{margin:0;background:#101216;color:#f3f5f7}
+main{max-width:560px;margin:auto;padding:22px 16px 40px}
+h1{font-size:1.55rem;margin:4px 0 6px} .sub{color:#aeb6c2;margin:0 0 20px;line-height:1.4}
+.card{background:#191d23;border:1px solid #2a3039;border-radius:16px;padding:16px;margin:12px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;color:#c9d0d8;font-size:.88rem;margin-bottom:5px}
+input{width:100%;font-size:1.08rem;padding:12px;border-radius:10px;border:1px solid #39414c;background:#0f1216;color:#fff}
+.unit{color:#8f9aa8;font-size:.8rem;margin-top:4px}
+.results{display:grid;gap:10px}
+.result{padding:14px;border-radius:12px;background:#11151a}
+.big{font-size:1.6rem;font-weight:750;margin:3px 0}.muted{color:#9da7b3;font-size:.88rem}
+.err{color:#ffb4ab}.ok{color:#b8f5c8}
+details{color:#aeb6c2;font-size:.88rem;line-height:1.45}
+@media(max-width:420px){.grid{grid-template-columns:1fr} main{padding-top:14px}}
+
+.stepper{display:grid;grid-template-columns:48px 1fr 48px;gap:6px}
+.stepper button{font-size:1.35rem;font-weight:700;border-radius:10px;border:1px solid #39414c;background:#252b33;color:#fff;min-height:44px}
+.stepper button:active{background:#343c47}
+.stepper input{text-align:center}
+.d0stepper{grid-template-columns:46px 46px 1fr 46px 46px}
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#101216">
+<link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body><main>
+<h1>Urapiston askeleen aikalaskuri</h1>
+
+
+<div class="card grid">
+  <div><label>Leikkuunopeus Vc</label><div class="stepper"><button type="button" data-id="vc" data-dir="-1">−</button><input id="vc" type="number" inputmode="decimal" step="10" value="150"><button type="button" data-id="vc" data-dir="1">+</button></div><div class="unit">m/min</div></div>
+  <div><label>Syöttö f</label><div class="stepper"><button type="button" data-id="f" data-dir="-1">−</button><input id="f" type="number" inputmode="decimal" step="0.01" value="0.10"><button type="button" data-id="f" data-dir="1">+</button></div><div class="unit">mm/r</div></div>
+  <div><label>Lähtöhalkaisija</label><div class="stepper d0stepper">
+<button type="button" data-id="d0" data-delta="-5">−5</button>
+<button type="button" data-id="d0" data-delta="-1">−1</button>
+<input id="d0" type="number" inputmode="decimal" step="5" value="50">
+<button type="button" data-id="d0" data-delta="1">+1</button>
+<button type="button" data-id="d0" data-delta="5">+5</button>
+</div><div class="unit">mm</div></div>
+  <div><label>Loppuhalkaisija</label><div class="stepper"><button type="button" data-id="d1" data-dir="-1">−</button><input id="d1" type="number" inputmode="decimal" step="1" value="10"><button type="button" data-id="d1" data-dir="1">+</button></div><div class="unit">mm</div></div>
+  <div><label>Lastunsyvyys aₚ</label><div class="stepper"><button type="button" data-id="ap" data-dir="-1">−</button><input id="ap" type="number" inputmode="decimal" step="0.1" value="1"><button type="button" data-id="ap" data-dir="1">+</button></div><div class="unit">mm säteellä</div></div>
+  <div><label>Maksimikierrosnopeus</label><div class="stepper"><button type="button" data-id="nmax" data-dir="-1">−</button><input id="nmax" type="number" inputmode="numeric" step="100" value="3000"><button type="button" data-id="nmax" data-dir="1">+</button></div><div class="unit">rpm</div></div>
+</div>
+
+<div class="card results">
+ <div id="error" class="err"></div>
+ <div class="result"><div class="muted">Pisin askel</div><div class="big" id="long">—</div></div>
+ <div class="result"><div class="muted">Lyhin askel</div><div class="big" id="short">—</div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["vc","f","d0","d1","ap","nmax"];
+
+const stepSizes={vc:10,f:0.01,d0:5,d1:1,ap:0.1,nmax:100};
+const stepDecimals={vc:0,f:2,d0:0,d1:0,ap:1,nmax:0};
+document.querySelectorAll(".stepper button").forEach(b=>{
+ b.addEventListener("click",()=>{
+  const id=b.dataset.id, el=$(id), dir=Number(b.dataset.dir);
+  let v=Number(el.value); if(!Number.isFinite(v)) v=0;
+  const delta=b.dataset.delta!==undefined ? Number(b.dataset.delta) : dir*stepSizes[id];
+  v=Math.max(0,v+delta);
+  el.value=v.toFixed(stepDecimals[id]);
+  calc();
+ });
+});
+
+ids.forEach(id=>$(id).addEventListener("input",calc));
+const fmt=(x,d=3)=>Number(x).toLocaleString("fi-FI",{minimumFractionDigits:d,maximumFractionDigits:d});
+function rpm(vc,D,nmax){ return Math.min(1000*vc/(Math.PI*D),nmax); }
+
+// Exact radial travel time from outer diameter Da to inner diameter Db.
+// D is diameter but physical radial displacement is -dD/2.
+// dt[min] = radial_distance / (f*n(D)).
+function stepTime(Da,Db,vc,f,nmax){
+  const Dc=1000*vc/(Math.PI*nmax);
+  let minutes=0;
+
+  // G96-alue: kierrosluku kasvaa halkaisijan pienentyessä.
+  const g96Outer=Da;
+  const g96Inner=Math.max(Db,Dc);
+  if(g96Outer>g96Inner){
+    minutes += Math.PI*(g96Outer*g96Outer-g96Inner*g96Inner)/(4000*f*vc);
+  }
+
+  // Kierrosrajoitettu alue: n = nmax.
+  const limOuter=Math.min(Da,Dc);
+  const limInner=Db;
+  if(limOuter>limInner){
+    minutes += ((limOuter-limInner)/2)/(f*nmax);
+  }
+
+  return minutes*60;
+}
+
+function calc(){
+ const vc=+$("vc").value,f=+$("f").value,d0=+$("d0").value,d1=+$("d1").value,ap=+$("ap").value,nmax=+$("nmax").value;
+ $("error").textContent="";
+ if(![vc,f,d0,ap,nmax].every(x=>Number.isFinite(x)&&x>0)||!Number.isFinite(d1)||d1<0||d0<=d1){
+  $("error").textContent="Tarkista arvot.";$("long").textContent="—";$("short").textContent="—";return;
+ }
+ const ds=2*ap;
+ if(d0-d1<ds-1e-12){
+  $("error").textContent="Halkaisija-alueelle ei mahdu yhtä täyttä askelta.";$("long").textContent="—";$("short").textContent="—";return;
+ }
+ const longest=stepTime(d0,d0-ds,vc,f,nmax);
+ const shortest=stepTime(d1+ds,d1,vc,f,nmax);
+ const show=t=>`${fmt(t)} s / ${Math.round(t*1000)} ms`;
+ $("long").textContent=show(longest);
+ $("short").textContent=show(shortest);
+}
+calc();
+</script>
+</main><script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js");
+  });
+}
+</script>
+</body></html>
