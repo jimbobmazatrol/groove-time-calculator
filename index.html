@@ -36,18 +36,18 @@ details{color:#aeb6c2;font-size:.88rem;line-height:1.45}
 
 
 <div class="card grid">
-  <div><label>Leikkuunopeus Vc</label><div class="stepper"><button type="button" data-id="vc" data-dir="-1">−</button><input id="vc" type="number" inputmode="decimal" step="10" value="150"><button type="button" data-id="vc" data-dir="1">+</button></div><div class="unit">m/min</div></div>
-  <div><label>Syöttö f</label><div class="stepper"><button type="button" data-id="f" data-dir="-1">−</button><input id="f" type="number" inputmode="decimal" step="0.01" value="0.10"><button type="button" data-id="f" data-dir="1">+</button></div><div class="unit">mm/r</div></div>
-  <div><label>Lähtöhalkaisija</label><div class="stepper d0stepper">
+  <div><label>Leikkuunopeus (m/min)</label><div class="stepper"><button type="button" data-id="vc" data-dir="-1">−</button><input id="vc" type="number" inputmode="decimal" step="10" value="100"><button type="button" data-id="vc" data-dir="1">+</button></div></div>
+  <div><label>Syöttö (mm/r)</label><div class="stepper"><button type="button" data-id="f" data-dir="-1">−</button><input id="f" type="number" inputmode="decimal" step="0.01" value="0.10"><button type="button" data-id="f" data-dir="1">+</button></div></div>
+  <div><label>Lähtöhalkaisija (mm)</label><div class="stepper d0stepper">
 <button type="button" data-id="d0" data-delta="-5">−5</button>
 <button type="button" data-id="d0" data-delta="-1">−1</button>
 <input id="d0" type="number" inputmode="decimal" step="5" value="50">
 <button type="button" data-id="d0" data-delta="1">+1</button>
 <button type="button" data-id="d0" data-delta="5">+5</button>
-</div><div class="unit">mm</div></div>
-  <div><label>Loppuhalkaisija</label><div class="stepper"><button type="button" data-id="d1" data-dir="-1">−</button><input id="d1" type="number" inputmode="decimal" step="1" value="10"><button type="button" data-id="d1" data-dir="1">+</button></div><div class="unit">mm</div></div>
-  <div><label>Lastunsyvyys aₚ</label><div class="stepper"><button type="button" data-id="ap" data-dir="-1">−</button><input id="ap" type="number" inputmode="decimal" step="0.1" value="1"><button type="button" data-id="ap" data-dir="1">+</button></div><div class="unit">mm säteellä</div></div>
-  <div><label>Maksimikierrosnopeus</label><div class="stepper"><button type="button" data-id="nmax" data-dir="-1">−</button><input id="nmax" type="number" inputmode="numeric" step="100" value="3000"><button type="button" data-id="nmax" data-dir="1">+</button></div><div class="unit">rpm</div></div>
+</div></div>
+  <div><label>Loppuhalkaisija (mm)</label><div class="stepper"><button type="button" data-id="d1" data-dir="-1">−</button><input id="d1" type="number" inputmode="decimal" step="1" value="0"><button type="button" data-id="d1" data-dir="1">+</button></div></div>
+  <div><label>Lastunsyvyys (mm säteellä)</label><div class="stepper"><button type="button" data-id="ap" data-dir="-1">−</button><input id="ap" type="number" inputmode="decimal" step="0.1" value="0.5"><button type="button" data-id="ap" data-dir="1">+</button></div></div>
+  <div><label>Maksimikierrosnopeus (rpm)</label><div class="stepper"><button type="button" data-id="nmax" data-dir="-1">−</button><input id="nmax" type="number" inputmode="numeric" step="100" value="2000"><button type="button" data-id="nmax" data-dir="1">+</button></div></div>
 </div>
 
 <div class="card results">
@@ -121,8 +121,21 @@ calc();
 </script>
 </main><script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js");
+  window.addEventListener("load", async () => {
+    const reg = await navigator.serviceWorker.register("./sw.js");
+    await reg.update();
+    if (reg.waiting) reg.waiting.postMessage({type:"SKIP_WAITING"});
+    reg.addEventListener("updatefound", () => {
+      const w = reg.installing;
+      if (w) w.addEventListener("statechange", () => {
+        if (w.state === "installed" && navigator.serviceWorker.controller)
+          w.postMessage({type:"SKIP_WAITING"});
+      });
+    });
+    let refreshing=false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!refreshing) { refreshing=true; location.reload(); }
+    });
   });
 }
 </script>
